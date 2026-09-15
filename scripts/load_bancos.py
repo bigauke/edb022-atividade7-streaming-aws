@@ -1,14 +1,3 @@
-"""
-EDB022 - Atividade 7 - utilitario
-Carrega o arquivo EnquadramentoInicia_v2.tsv (Segmento; CNPJ; Nome) na
-tabela `bancos` do banco de dados relacional (Postgres/RDS), calculando
-tambem a coluna `nome_normalizado`, usada pelo consumer_lambda para o
-casamento com as Reclamacoes.
-
-Uso:
-    python scripts/load_bancos.py --path data/bancos_sample/enquadramento_amostra.tsv
-    python scripts/load_bancos.py --path /caminho/completo/EnquadramentoInicia_v2.tsv
-"""
 import argparse
 import os
 import re
