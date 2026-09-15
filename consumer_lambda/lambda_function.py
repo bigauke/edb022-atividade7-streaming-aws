@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import re
 import sys
@@ -8,9 +7,6 @@ from datetime import datetime, timezone
 import boto3
 import psycopg2
 import psycopg2.extras
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
 
 S3_BUCKET = os.environ.get("S3_BUCKET", "edb022-datalake")
 S3_OUTPUT_PREFIX = os.environ.get("S3_OUTPUT_PREFIX", "refined/reclamacoes-bancos/")
@@ -27,20 +23,6 @@ LOCAL_OUTPUT_DIR = os.environ.get("LOCAL_OUTPUT_DIR", "output/reclamacoes_bancos
 s3_client = boto3.client("s3", region_name=AWS_REGION)
 
 _SUFFIXES = [r"\(conglomerado\)", r"-\s*prudencial", r"s/a", r"s\.a\.?"]
-_conn = None
-
-
-def _get_connection():
-    global _conn
-    if _conn is None or _conn.closed:
-        _conn = psycopg2.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
-        )
-    return _conn
 
 
 def normalize_nome(nome: str) -> str:
@@ -54,6 +36,12 @@ def normalize_nome(nome: str) -> str:
     texto = re.sub(r"[^A-Z0-9 ]", " ", texto)
     texto = re.sub(r"\s+", " ", texto).strip()
     return texto
+
+
+def _get_connection():
+    return psycopg2.connect(
+        host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD
+    )
 
 
 def _enrich_with_bancos(conn, instituicao_financeira: str) -> dict:
@@ -72,15 +60,7 @@ def _enrich_with_bancos(conn, instituicao_financeira: str) -> dict:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(query, (nome_normalizado,))
         row = cur.fetchone()
-
-    if not row:
-        logger.warning(
-            "Sem correspondencia em `bancos` para instituicao=%r (normalizado=%r)",
-            instituicao_financeira,
-            nome_normalizado,
-        )
-        return {}
-    return dict(row)
+    return dict(row) if row else {}
 
 
 def _write_output(record: dict, local: bool):
@@ -103,57 +83,40 @@ def _write_output(record: dict, local: bool):
     return key
 
 
-def _process_message(conn, message: dict, local: bool) -> str:
-    """Processa uma unica mensagem SQS e retorna o destino do registro
-    gravado. Deixa a excecao subir para o chamador tratar (permite
-    isolar falhas por mensagem no handler)."""
-    body = json.loads(message["body"])
-    instituicao = body.get("instituicao_financeira", "")
-
-    enrichment = _enrich_with_bancos(conn, instituicao)
-    enriched_record = {
-        **body,
-        "banco_enriquecido": enrichment,
-        "processado_em": datetime.now(timezone.utc).isoformat(),
-    }
-    return _write_output(enriched_record, local)
-
-
 def handler(event, context):
-
+    """Ponto de entrada da AWS Lambda, disparado por evento da SQS
+    (ou chamado localmente com um evento de teste no modo --local)."""
     local = bool(event.get("local")) if isinstance(event, dict) else False
 
     conn = _get_connection()
     processed = 0
-    batch_item_failures = []
+    try:
+        records = event.get("Records", [])
+        for message in records:
+            body = json.loads(message["body"])
+            instituicao = body.get("instituicao_financeira", "")
 
-    records = event.get("Records", [])
-    for message in records:
-        message_id = message.get("messageId", "local")
-        try:
-            destino = _process_message(conn, message, local)
+            enrichment = _enrich_with_bancos(conn, instituicao)
+            enriched_record = {
+                **body,
+                "banco_enriquecido": enrichment,
+                "processado_em": datetime.now(timezone.utc).isoformat(),
+            }
+            destino = _write_output(enriched_record, local)
             processed += 1
-            logger.info("Registro enriquecido gravado em %s", destino)
-        except Exception:
-            logger.exception(
-                "Falha ao processar mensagem messageId=%s -- sera reenviada pela SQS",
-                message_id,
-            )
-            batch_item_failures.append({"itemIdentifier": message_id})
+            print(f"[OK] Registro enriquecido gravado em {destino}")
+    finally:
+        conn.close()
 
-    return {
-        "statusCode": 200,
-        "body": json.dumps({"mensagens_processadas": processed}),
-        "batchItemFailures": batch_item_failures,
-    }
+    return {"statusCode": 200, "body": json.dumps({"mensagens_processadas": processed})}
 
 
 if __name__ == "__main__":
+    # Execucao local com uma mensagem de exemplo (`python lambda_function.py --local`)
     sample_event = {
         "local": "--local" in sys.argv,
         "Records": [
             {
-                "messageId": "local-1",
                 "body": json.dumps(
                     {
                         "ano": 2021,
@@ -165,9 +128,8 @@ if __name__ == "__main__":
                         "qtd_total_reclamacoes": 4308,
                     },
                     ensure_ascii=False,
-                ),
+                )
             }
         ],
     }
-    logging.basicConfig(level=logging.INFO)
-    print(handler(sample_event, None))
+    handler(sample_event, None)
