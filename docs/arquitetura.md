@@ -9,7 +9,7 @@
 | Consumidor / Enriquecedor | AWS Lambda (gatilho SQS) | Normaliza o nome da instituição e consulta a tabela `bancos` para enriquecer cada mensagem |
 | Armazenamento final | AWS S3 | Grava a junção reclamações + bancos, particionada por data |
 
-## O desafio de casamento entre Reclamações e Bancos
+## Reclamações e Bancos
 
 Os dois arquivos de origem nomeiam as instituições de formas diferentes:
 
@@ -33,12 +33,10 @@ do dataset.
 - **Desacoplamento via fila**: o Produtor não sabe nada sobre o Consumidor; se o Consumidor cair, as mensagens continuam na fila (até o `VisibilityTimeout` expirar) ou vão para a Dead Letter Queue após 5 tentativas.
 - **Enriquecimento just-in-time**: a junção com `bancos` acontece no momento do consumo (não em lote), simulando um cenário de streaming/near-real-time.
 - **Idempotência**: cada mensagem processada gera um arquivo novo (nome com timestamp de microssegundos), evitando conflitos em reprocessamentos.
-- **Particionamento por data (`dt=YYYY-MM-DD`)**: facilita consultas posteriores (Athena/Glue) e a organização em camadas Medallion.
-- **Amostras versionadas**: como o dataset completo é grande, o repositório versiona apenas amostras reais (20–30 linhas) em `data/`, suficientes para testar o pipeline de ponta a ponta localmente.
+- **Particionamento por data (`dt=YYYY-MM-DD`)**: facilita consultas posteriores/organização em camadas Medallion.
 
 ## Possíveis evoluções
 
-- Trocar o polling/schedule do Produtor por um gatilho `S3 ObjectCreated` (event-driven puro).
 - Persistir também em uma tabela `delivery` no banco relacional, além do S3.
 - Adicionar métricas de fila (CloudWatch: `ApproximateNumberOfMessagesVisible`) para monitorar atraso de processamento.
 - Registrar, para instituições sem correspondência em `bancos` (ex.: fintechs fora do Enquadramento Inicial), um indicador `banco_enriquecido: {}` para acompanhamento de cobertura da junção.
