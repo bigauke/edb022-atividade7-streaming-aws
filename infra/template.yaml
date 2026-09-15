@@ -1,65 +1,3 @@
-AWSTemplateFormatVersion: "2010-09-09"
-Transform: AWS::Serverless-2016-10-31
-Description: >
-  EDB022 - Atividade 7 - Pipeline de streaming serverless
-  (S3 -> SQS -> Lambda enriquecedora -> S3)
-
-Parameters:
-  BucketName:
-    Type: String
-    Default: edb022-datalake
-  DbHost:
-    Type: String
-  DbName:
-    Type: String
-    Default: case_dados
-  DbUser:
-    Type: String
-  DbPassword:
-    Type: String
-    NoEcho: true
-
-Resources:
-
-  DataLakeBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Ref BucketName
-
-  ReclamacoesDLQ:
-    Type: AWS::SQS::Queue
-    Properties:
-      QueueName: edb022-reclamacoes-dlq
-
-  ReclamacoesQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      QueueName: edb022-reclamacoes-queue
-      VisibilityTimeout: 60
-      RedrivePolicy:
-        deadLetterTargetArn: !GetAtt ReclamacoesDLQ.Arn
-        maxReceiveCount: 5
-
-  ProducerFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: edb022-atv7-producer
-      CodeUri: ../producer_lambda/
-      Handler: lambda_function.handler
-      Runtime: python3.11
-      Timeout: 60
-      MemorySize: 256
-      Environment:
-        Variables:
-          S3_BUCKET: !Ref BucketName
-          S3_RAW_PREFIX: raw/reclamacoes/
-          SQS_QUEUE_URL: !Ref ReclamacoesQueue
-      Policies:
-        - S3ReadPolicy:
-            BucketName: !Ref BucketName
-        - SQSSendMessagePolicy:
-            QueueName: !GetAtt ReclamacoesQueue.QueueName
-
   ConsumerFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -88,9 +26,5 @@ Resources:
           Properties:
             Queue: !GetAtt ReclamacoesQueue.Arn
             BatchSize: 10
-
-Outputs:
-  QueueUrl:
-    Value: !Ref ReclamacoesQueue
-  BucketName:
-    Value: !Ref DataLakeBucket
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
