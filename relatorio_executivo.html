@@ -71,10 +71,10 @@
     <div class="bg-white rounded-2xl shadow-xl p-12 mb-10 print:break-before-page">
         <h3 class="text-2xl font-bold text-slate-800 border-b-2 border-blue-500 pb-2 mb-6">1. Visão Geral da Arquitetura</h3>
         <p class="text-slate-600 leading-[1.5] mb-6 text-justify">
-            A solução implementada consiste em um pipeline de dados em nuvem 100% <i>serverless</i>. A arquitetura foi desenhada para promover o desacoplamento entre componentes, garantindo alta disponibilidade, escalabilidade sob demanda e tolerância a falhas.
+            A nossa solução é um pipeline de dados na nuvem rodando 100% <i>serverless</i>. A gente desenhou a arquitetura com o objetivo principal de manter as partes do sistema totalmente desacopladas, o que nos garante que se uma peça falhar, a outra não cai junto.
         </p>
         <p class="text-slate-600 leading-[1.5] mb-8 text-justify">
-            O fluxo de dados se inicia na camada <b>Raw</b> do Amazon S3. Eventos de criação de novos objetos desencadeiam uma arquitetura orientada a eventos, utilizando funções AWS Lambda para leitura e serialização. A fila Amazon SQS atua como buffer e orquestrador de cadência (<i>rate limiting</i>), injetando resiliência. Na ponta, o dado é enriquecido através de requisições de baixa latência em um banco de dados relacional (Amazon RDS) e consolidado em formato JSON estruturado na camada <b>Refined</b>.
+            Na prática, o fluxo começa quando os dados crus caem na camada <b>Raw</b> do Amazon S3. Esse evento "acorda" a nossa primeira Lambda (Produtora), que puxa o arquivo, faz a leitura e injeta os registros na nossa fila do Amazon SQS. O SQS entra em cena justamente para servir de "amortecedor" (<i>buffer</i>), garantindo que a nossa Lambda Consumidora não seja metralhada de uma vez só em horários de pico. Por fim, a Consumidora pega essas mensagens na fila, bate no banco relacional (Amazon RDS) para enriquecer o dado, e devolve o JSON pronto para consumo lá na camada <b>Refined</b>.
         </p>
         
         <div class="bg-slate-50 p-6 rounded-lg border border-slate-200">
@@ -91,7 +91,7 @@
     <div class="bg-white rounded-2xl shadow-xl p-12 mb-10 print:break-before-page">
         <h3 class="text-2xl font-bold text-slate-800 border-b-2 border-blue-500 pb-2 mb-6">2. Estrutura Base de Enriquecimento (RDS)</h3>
         <p class="text-slate-600 leading-[1.5] mb-6 text-justify">
-            Como pré-requisito para o pipeline, foi provisionada uma instância do banco de dados relacional <b>PostgreSQL no Amazon RDS</b>. As tabelas de domínio foram populadas com o dataset de enquadramento das instituições financeiras, que servirá de dicionário para o enriquecimento dos dados transmitidos por stream.
+            Antes de colocar o pipeline pra rodar, a gente precisava do nosso dicionário de dados no ar. Para isso, subimos uma instância do <b>PostgreSQL no Amazon RDS</b>. Lá dentro, nós populamos as tabelas com o <i>dataset</i> de enquadramento dos bancos. É exatamente essa tabela que a nossa Lambda vai consultar em tempo real para cruzar e descobrir qual é o segmento oficial de cada banco que aparece na reclamação.
         </p>
         
         <div class="mb-8 print:break-inside-avoid">
@@ -113,7 +113,7 @@
     <div class="bg-white rounded-2xl shadow-xl p-12 mb-10 print:break-before-page">
         <h3 class="text-2xl font-bold text-slate-800 border-b-2 border-blue-500 pb-2 mb-6">3. Ingestão e Enfileiramento de Mensagens</h3>
         <p class="text-slate-600 leading-[1.5] mb-6 text-justify">
-            A ingestão dos arquivos brutos (formato CSV) ocorre no Data Lake (Amazon S3). A função <i>Producer Lambda</i> processa os lotes e enfileira as requisições, evitando a sobrecarga de leitura nos componentes downstream. O Amazon SQS garante que nenhuma transação seja perdida, gerenciando o tráfego em picos de demanda.
+            Aqui é onde a mágica começa. A gente faz o upload do arquivo CSV cheio de reclamações direto no Data Lake (camada Raw do S3). Assim que o arquivo bate lá, a <i>Producer Lambda</i> já entra em ação, lendo os registros e fatiando tudo em lotes (<i>batches</i>) para mandar pra fila. O uso do Amazon SQS aqui foi o nosso grande trunfo: ele segura a onda nos momentos de pico, garantindo que não vamos perder nenhuma mensagem e nem engargalar os sistemas que vêm depois.
         </p>
         
         <div class="mb-8 print:break-inside-avoid">
@@ -136,7 +136,7 @@
     <div class="bg-white rounded-2xl shadow-xl p-12 mb-10 print:break-before-page">
         <h3 class="text-2xl font-bold text-slate-800 border-b-2 border-blue-500 pb-2 mb-6">4. Enriquecimento e Disponibilização</h3>
         <p class="text-slate-600 leading-[1.5] mb-6 text-justify">
-            O fluxo se encerra com a <i>Consumer Lambda</i> processando o <i>batch</i> de mensagens retidas no SQS. A aplicação realiza consultas no RDS PostgreSQL utilizando indexação em memória para atrelar a taxonomia de instituições bancárias. O payload final é exportado como JSON para a camada Refined do S3, criando partições automáticas.
+            O grande final do fluxo acontece na <i>Consumer Lambda</i>, que fica só espiando as mensagens chegarem no SQS. Assim que a mensagem bate na porta, ela dá um pulinho rápido lá no PostgreSQL (RDS) pra consultar o nome da instituição e puxar o enquadramento correto. Depois de casar esses dois mundos (o evento de streaming e o dado relacional estático), ela gera o <i>payload</i> final e salva o arquivo JSON já enriquecido na camada Refined do nosso S3.
         </p>
         
         <div class="mb-8 print:break-inside-avoid">
