@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: EDB022 Atividade 7 Streaming AWS
+Parameters:
+  DbHost:
+    Type: String
+    Default: test-host
+  DbName:
+    Type: String
+    Default: test-db
+  DbUser:
+    Type: String
+    Default: postgres
+  DbPassword:
+    Type: String
+    Default: postgres
+    NoEcho: true
+Resources:
+  ReclamacoesBucket:
+    Type: AWS::S3::Bucket
+  ReclamacoesQueueDLQ:
+    Type: AWS::SQS::Queue
+  ReclamacoesQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: edb022-reclamacoes-queue
+      VisibilityTimeout: 180
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - ReclamacoesQueueDLQ
+          - Arn
+        maxReceiveCount: 3
+  ProducerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: edb022-atv7-producer
+      CodeUri: 
+        s3://edb022-atv7-sam-bucket-639251638547888839/1389b2246d0ed96d15f48c27d3ecf049
+      Handler: lambda_function.handler
+      Runtime: python3.11
+      Timeout: 30
+      MemorySize: 256
+      Role:
+        Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/LabRole
+      Environment:
+        Variables:
+          S3_BUCKET:
+            Ref: ReclamacoesBucket
+          SQS_QUEUE_URL:
+            Ref: ReclamacoesQueue
+  ConsumerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: edb022-atv7-consumer
+      CodeUri: 
+        s3://edb022-atv7-sam-bucket-639251638547888839/35bcaa7b5d725799379a176bb16ac6be
+      Handler: lambda_function.handler
+      Runtime: python3.11
+      Timeout: 30
+      MemorySize: 256
+      Role:
+        Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/LabRole
+      Environment:
+        Variables:
+          S3_BUCKET:
+            Ref: ReclamacoesBucket
+          S3_OUTPUT_PREFIX: refined/reclamacoes-bancos/
+          DB_HOST:
+            Ref: DbHost
+          DB_NAME:
+            Ref: DbName
+          DB_USER:
+            Ref: DbUser
+          DB_PASSWORD:
+            Ref: DbPassword
+      Events:
+        SQSTrigger:
+          Type: SQS
+          Properties:
+            Queue:
+              Fn::GetAtt:
+              - ReclamacoesQueue
+              - Arn
+            BatchSize: 10
+            FunctionResponseTypes:
+            - ReportBatchItemFailures
