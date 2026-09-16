@@ -11,12 +11,30 @@ Implementar um pipeline de **streaming serverless na AWS**, no qual:
 2. Uma fila **AWS SQS** desacopla produção e consumo.
 3. Um **Consumidor/Enriquecedor** (AWS Lambda, disparada pela SQS) recebe cada mensagem, consulta o banco de dados SQL (dados de **Bancos**, já tratados) para enriquecer a reclamação, e grava o resultado em um bucket **S3** (camada de saída).
 
-```
- Produtor          Fila           Consumidor (enriquecedor)
-┌──────────┐   ┌──────────┐   ┌─────────────────────────────┐
-│ S3 / RAW │──▶│  SQS     │──▶│ Lambda + consulta SQL (Bancos)│──▶ S3
-│Reclamações│  └──────────┘   └─────────────────────────────┘   (junção)
-└──────────┘
+```mermaid
+graph LR
+    %% Nós
+    S3RAW["📦 Amazon S3\n(Camada Raw)"]
+    PRODUCER["⚡ AWS Lambda\n(Producer)"]
+    SQS["📨 Amazon SQS\n(Fila de Mensagens)"]
+    CONSUMER["⚡ AWS Lambda\n(Consumer)"]
+    RDS["🗄️ Amazon RDS\n(PostgreSQL - Bancos)"]
+    S3REFINED["📦 Amazon S3\n(Camada Refined)"]
+
+    %% Conexões
+    S3RAW -- "1. Evento de Arquivo (CSV)" --> PRODUCER
+    PRODUCER -- "2. Publica Mensagens" --> SQS
+    SQS -- "3. Dispara Batch" --> CONSUMER
+    RDS -. "4. Consulta SQL (Enquadramento)" .-> CONSUMER
+    CONSUMER -- "5. Grava Resultado (JSON)" --> S3REFINED
+
+    %% Estilos
+    style S3RAW fill:#3F8624,stroke:#fff,stroke-width:2px,color:#fff,rx:10,ry:10
+    style S3REFINED fill:#3F8624,stroke:#fff,stroke-width:2px,color:#fff,rx:10,ry:10
+    style PRODUCER fill:#D86613,stroke:#fff,stroke-width:2px,color:#fff,rx:10,ry:10
+    style CONSUMER fill:#D86613,stroke:#fff,stroke-width:2px,color:#fff,rx:10,ry:10
+    style SQS fill:#FF4F8B,stroke:#fff,stroke-width:2px,color:#fff,rx:10,ry:10
+    style RDS fill:#336699,stroke:#fff,stroke-width:2px,color:#fff,rx:10,ry:10
 ```
 
 ## Dados utilizados
