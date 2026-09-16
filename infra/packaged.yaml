@@ -36,7 +36,7 @@ Resources:
     Properties:
       FunctionName: edb022-atv7-producer
       CodeUri: 
-        s3://edb022-atv7-sam-bucket-639251638547888839/1389b2246d0ed96d15f48c27d3ecf049
+        s3://edb022-atv7-sam-bucket-639251749009637392/a450b87ac22577abcee3471d434477f8
       Handler: lambda_function.handler
       Runtime: python3.11
       Timeout: 30
@@ -45,16 +45,28 @@ Resources:
         Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/LabRole
       Environment:
         Variables:
-          S3_BUCKET:
-            Ref: ReclamacoesBucket
           SQS_QUEUE_URL:
             Ref: ReclamacoesQueue
+      Events:
+        S3Upload:
+          Type: S3
+          Properties:
+            Bucket:
+              Ref: ReclamacoesBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                - Name: prefix
+                  Value: raw/reclamacoes/
+                - Name: suffix
+                  Value: .csv
   ConsumerFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: edb022-atv7-consumer
       CodeUri: 
-        s3://edb022-atv7-sam-bucket-639251638547888839/35bcaa7b5d725799379a176bb16ac6be
+        s3://edb022-atv7-sam-bucket-639251749009637392/87d54768a4b0f6c646d89e7d7b7fe480
       Handler: lambda_function.handler
       Runtime: python3.11
       Timeout: 30

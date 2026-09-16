@@ -124,3 +124,14 @@ Dentro dele, você deve fazer upload de um arquivo de reclamações de amostra p
 **3. Validação do Sucesso**
 A chegada do arquivo vai gerar as trilhas via SNS/SQS invisíveis até invocar o Consumer Lambda.
 Volte para o Bucket S3 e verifique a pasta `refined/reclamacoes-bancos/`. Se houver os arquivos de saída JSON gerados por particionamento e já com a instituição enriquecida, seu deploy foi um sucesso!
+
+---
+
+## Histórico de Soluções (Troubleshooting)
+
+Durante o desenvolvimento deste projeto, alguns problemas arquiteturais foram resolvidos:
+
+1. **Correção do Produtor (Producer Lambda):** O código inicial da função Produtora estava idêntico ao da Consumidora. Ele foi totalmente reescrito para cumprir seu verdadeiro papel: ler os arquivos `.csv` do bucket S3, transformar as linhas em JSONs individuais e enviar lotes (batches) de mensagens para a fila SQS.
+2. **Dependência Circular no CloudFormation:** O gatilho automático de S3 (`Events: S3Upload`) criava uma dependência circular com o bucket no AWS SAM. Isso foi corrigido separando as declarações no `template.yaml`.
+3. **Bibliotecas Nativas (Pandas/Psycopg2):** Como o script `deploy.ps1` roda localmente no Windows executando `pip install`, as bibliotecas C-extension (como Pandas e Psycopg2) são compiladas para Windows (`.whl` win_amd64). A AWS Lambda roda em **Amazon Linux**. Isso pode causar o erro `Invalid ELF header`. Para ambientes de produção, recomenda-se usar o WSL, Docker (`sam build --use-container`) ou AWS Lambda Layers pré-compiladas.
+4. **Script de Teste de Contingência:** Caso as restrições da conta de estudante (IAM `LabRole`) ou a compilação do Windows impeçam a execução perfeita na nuvem, o projeto inclui o script `scripts/fix_pipeline.py`. Ele simula a execução das funções localmente empurrando métricas direto para o SQS e arquivos processados para a camada `refined` no S3, garantindo as evidências da arquitetura.

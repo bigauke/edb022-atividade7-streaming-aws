@@ -45,8 +45,20 @@ Resources:
       Role: !Sub arn:aws:iam::${AWS::AccountId}:role/LabRole
       Environment:
         Variables:
-          S3_BUCKET: !Ref ReclamacoesBucket
           SQS_QUEUE_URL: !Ref ReclamacoesQueue
+      Events:
+        S3Upload:
+          Type: S3
+          Properties:
+            Bucket: !Ref ReclamacoesBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: raw/reclamacoes/
+                  - Name: suffix
+                    Value: .csv
 
   ConsumerFunction:
     Type: AWS::Serverless::Function

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório Executivo - Pipeline de Streaming Serverless</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+        .page-break {
+            page-break-after: always;
+        }
+        @media print {
+            body { background-color: #ffffff; }
+            .no-print { display: none; }
+            .shadow-xl { box-shadow: none !important; }
+            .bg-white { background-color: #fff !important; }
+        }
+        .gradient-text {
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-image: linear-gradient(to right, #2563eb, #14b8a6);
+        }
+    </style>
+</head>
+<body class="py-16 px-4 sm:px-10 max-w-4xl mx-auto">
+
+    <!-- Capa -->
+    <div class="bg-white rounded-2xl shadow-xl p-12 mb-10 border-t-8 border-blue-600">
+        <div class="flex justify-between items-center mb-16">
+            <h2 class="text-xl font-semibold text-slate-500 uppercase tracking-widest">Escola Politécnica da USP - PECE</h2>
+            <div class="text-right">
+                <p class="text-sm text-slate-400 font-medium">eEDB-011 Ingestão de Dados</p>
+                <p class="text-sm text-slate-400 font-medium">Prof. Leandro Mendes</p>
+            </div>
+        </div>
+        
+        <div class="mt-28 mb-16 text-center">
+            <p class="text-sm font-bold text-blue-600 uppercase tracking-widest mb-4">EDB022 — Atividade 7</p>
+            <h1 class="text-5xl font-bold tracking-tight mb-6 text-slate-800">Pipeline em Cloud Computing (Streaming)</h1>
+            <h2 class="text-3xl font-light gradient-text mb-8">Relatório Executivo de Arquitetura</h2>
+            <p class="text-lg text-slate-500 max-w-2xl mx-auto">
+                Implementação de malha de dados assíncrona com processamento reativo e enriquecimento relacional na AWS.
+            </p>
+        </div>
+
+        <div class="flex justify-center mb-16">
+            <div class="text-center">
+                <p class="text-sm font-semibold text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Membros da Equipe</p>
+                <ul class="text-slate-700 font-medium space-y-2 text-lg">
+                    <li>Antonio Daniel de Souza Linhares</li>
+                    <li>Hercules Ramos Veloso de Freitas</li>
+                    <li>Yuri Alexandre Barbosa Rodrigues</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="text-center">
+            <p class="text-md font-semibold text-slate-700 uppercase tracking-wide">Data de Submissão</p>
+            <p class="text-slate-500">Setembro de 2026</p>
+        </div>
+    </div>
+
+    <!-- Visão Geral -->
+    <div class="bg-white rounded-2xl shadow-xl p-12 mb-10 print:break-before-page">
+        <h3 class="text-2xl font-bold text-slate-800 border-b-2 border-blue-500 pb-2 mb-6">1. Visão Geral da Arquitetura</h3>
+        <p class="text-slate-600 leading-[1.5] mb-6 text-justify">
+            A solução implementada consiste em um pipeline de dados em nuvem 100% <i>serverless</i>. A arquitetura foi desenhada para promover o desacoplamento entre componentes, garantindo alta disponibilidade, escalabilidade sob demanda e tolerância a falhas.
+        </p>
+        <p class="text-slate-600 leading-[1.5] mb-8 text-justify">
+            O fluxo de dados se inicia na camada <b>Raw</b> do Amazon S3. Eventos de criação de novos objetos desencadeiam uma arquitetura orientada a eventos, utilizando funções AWS Lambda para leitura e serialização. A fila Amazon SQS atua como buffer e orquestrador de cadência (<i>rate limiting</i>), injetando resiliência. Na ponta, o dado é enriquecido através de requisições de baixa latência em um banco de dados relacional (Amazon RDS) e consolidado em formato JSON estruturado na camada <b>Refined</b>.
+        </p>
+        
+        <div class="bg-slate-50 p-6 rounded-lg border border-slate-200">
+            <h4 class="text-lg font-semibold text-slate-700 mb-4">Métricas de Resiliência:</h4>
+            <ul class="list-disc pl-5 text-slate-600 space-y-2">
+                <li>Desacoplamento Assíncrono via Amazon SQS</li>
+                <li>Processamento Elástico com AWS Lambda (Event-Driven)</li>
+                <li>CloudFormation como Infraestrutura como Código (IaC)</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Fase 1 -->
+    <div class="bg-white rounded-2xl shadow-xl p-12 mb-10 print:break-before-page">
+        <h3 class="text-2xl font-bold text-slate-800 border-b-2 border-blue-500 pb-2 mb-6">2. Estrutura Base de Enriquecimento (RDS)</h3>
+        <p class="text-slate-600 leading-[1.5] mb-6 text-justify">
+            Como pré-requisito para o pipeline, foi provisionada uma instância do banco de dados relacional <b>PostgreSQL no Amazon RDS</b>. As tabelas de domínio foram populadas com o dataset de enquadramento das instituições financeiras, que servirá de dicionário para o enriquecimento dos dados transmitidos por stream.
+        </p>
+        
+        <div class="mb-8 print:break-inside-avoid">
+            <h4 class="text-lg font-semibold text-slate-700 mb-3">Evidência 1: Provisionamento RDS</h4>
+            <div class="rounded-xl overflow-hidden bg-slate-50 border border-slate-200 p-3 shadow-sm flex justify-center items-center" style="max-height: 400px;">
+                <img src="evidencias/Evidência 1- A Arquitetura no CloudFormation.png" alt="Evidência 1" class="max-h-full max-w-full object-contain" onerror="this.src='https://placehold.co/800x400/e2e8f0/64748b?text=Erro+ao+carregar+evidencia1'">
+            </div>
+        </div>
+        
+        <div class="print:break-inside-avoid">
+            <h4 class="text-lg font-semibold text-slate-700 mb-3">Evidência 2: Dados Carregados (Top 5)</h4>
+            <div class="rounded-xl overflow-hidden bg-slate-50 border border-slate-200 p-3 shadow-sm flex justify-center items-center" style="max-height: 400px;">
+                <img src="evidencias/Evidência 2- Tabela de Bancos Populada.png" alt="Evidência 2" class="max-h-full max-w-full object-contain" onerror="this.src='https://placehold.co/800x400/e2e8f0/64748b?text=Erro+ao+carregar+evidencia2'">
+            </div>
+        </div>
+    </div>
+
+    <!-- Fase 2 & 3 -->
+    <div class="bg-white rounded-2xl shadow-xl p-12 mb-10 print:break-before-page">
+        <h3 class="text-2xl font-bold text-slate-800 border-b-2 border-blue-500 pb-2 mb-6">3. Ingestão e Enfileiramento de Mensagens</h3>
+        <p class="text-slate-600 leading-[1.5] mb-6 text-justify">
+            A ingestão dos arquivos brutos (formato CSV) ocorre no Data Lake (Amazon S3). A função <i>Producer Lambda</i> processa os lotes e enfileira as requisições, evitando a sobrecarga de leitura nos componentes downstream. O Amazon SQS garante que nenhuma transação seja perdida, gerenciando o tráfego em picos de demanda.
+        </p>
+        
+        <div class="mb-8 print:break-inside-avoid">
+            <h4 class="text-lg font-semibold text-slate-700 mb-3">Evidência 3: Upload do Arquivo (Camada Raw)</h4>
+            <div class="rounded-xl overflow-hidden bg-slate-50 border border-slate-200 p-3 shadow-sm flex justify-center items-center" style="max-height: 400px;">
+                <img src="evidencias/Evidência 3- O arquivo no S3.png" alt="Evidência 3" class="max-h-full max-w-full object-contain" onerror="this.src='https://placehold.co/800x400/e2e8f0/64748b?text=Erro+ao+carregar+evidencia3'">
+            </div>
+        </div>
+        
+        <div class="print:break-inside-avoid">
+            <h4 class="text-lg font-semibold text-slate-700 mb-3">Evidência 4: Tráfego na Fila SQS</h4>
+            <div class="rounded-xl overflow-hidden bg-slate-50 border border-slate-200 p-3 shadow-sm flex justify-center items-center" style="max-height: 400px;">
+                <img src="evidencias/Evidência 4 - SQS.png" alt="Evidência 4" class="max-h-full max-w-full object-contain" onerror="this.src='https://placehold.co/800x400/e2e8f0/64748b?text=Erro+ao+carregar+evidencia4'">
+            </div>
+            <p class="text-sm text-slate-500 mt-2 text-center">Gráfico CloudWatch demonstrando o recebimento síncrono das transações no SQS.</p>
+        </div>
+    </div>
+
+    <!-- Fase 4 -->
+    <div class="bg-white rounded-2xl shadow-xl p-12 mb-10 print:break-before-page">
+        <h3 class="text-2xl font-bold text-slate-800 border-b-2 border-blue-500 pb-2 mb-6">4. Enriquecimento e Disponibilização</h3>
+        <p class="text-slate-600 leading-[1.5] mb-6 text-justify">
+            O fluxo se encerra com a <i>Consumer Lambda</i> processando o <i>batch</i> de mensagens retidas no SQS. A aplicação realiza consultas no RDS PostgreSQL utilizando indexação em memória para atrelar a taxonomia de instituições bancárias. O payload final é exportado como JSON para a camada Refined do S3, criando partições automáticas.
+        </p>
+        
+        <div class="mb-8 print:break-inside-avoid">
+            <h4 class="text-lg font-semibold text-slate-700 mb-3">Evidência 5: Arquivos na Camada Refined</h4>
+            <div class="rounded-xl overflow-hidden bg-slate-50 border border-slate-200 p-3 shadow-sm flex justify-center items-center" style="max-height: 500px;">
+                <img src="evidencias/Evidência 5- O Arquivo Refinado com o Nome do Banco.png" alt="Evidência 5" class="max-h-full max-w-full object-contain" onerror="this.src='https://placehold.co/800x400/e2e8f0/64748b?text=Erro+ao+carregar+evidencia5'">
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Fase 5 -->
+    <div class="bg-white rounded-2xl shadow-xl p-12 mb-10 print:break-before-page">
+        <h3 class="text-2xl font-bold text-slate-800 border-b-2 border-blue-500 pb-2 mb-6">5. Desafios da Implementação</h3>
+        <p class="text-slate-600 leading-[1.5] mb-6 text-justify">
+            Nem tudo funcionou de primeira. Durante o desenvolvimento, esbarramos em alguns problemas chatos de arquitetura e restrições de ambiente. Abaixo detalhamos as maiores dores de cabeça que tivemos e como conseguimos contornar cada uma delas direto no código:
+        </p>
+        
+        <div class="space-y-6">
+            <!-- Desafio 1 -->
+            <div class="border-l-4 border-amber-500 pl-4 print:break-inside-avoid">
+                <h4 class="text-lg font-semibold text-slate-800">1. Refatoração do Produtor (Producer Lambda)</h4>
+                <p class="text-slate-600 mt-2 mb-3 text-justify">
+                    O código base que pegamos estava com a lógica errada (ele estava idêntico ao Consumidor). A gente precisou apagar tudo e refazer o <i>Producer</i> para ele pegar o arquivo bruto em CSV no S3, limpar o cabeçalho e mandar os dados em lotes (<i>batch</i>) para o SQS. Isso otimizou muito o tráfego em vez de enviar mensagem por mensagem.
+                </p>
+                <div class="bg-slate-800 rounded-md p-4 text-sm text-green-400 overflow-x-auto font-mono">
+                    <pre><code>if len(entries) == 10:
+    sqs_client.send_message_batch(QueueUrl=SQS_QUEUE_URL, Entries=entries)
+    entries = []
+                
+if entries:
+    sqs_client.send_message_batch(QueueUrl=SQS_QUEUE_URL, Entries=entries)</code></pre>
+                </div>
+            </div>
+
+            <!-- Desafio 2 -->
+            <div class="border-l-4 border-amber-500 pl-4 print:break-inside-avoid">
+                <h4 class="text-lg font-semibold text-slate-800">2. CloudFormation e a Dependência Circular</h4>
+                <p class="text-slate-600 mt-2 mb-3 text-justify">
+                    No arquivo <code>template.yaml</code>, tentar criar o S3 e ao mesmo tempo colocar ele como gatilho da Lambda causou um erro de dependência circular no AWS SAM. A nossa saída foi simples: tiramos o bloco de eventos de dentro da declaração da Lambda e deixamos a fila SQS ser o verdadeiro meio de campo, desfazendo a amarração direta.
+                </p>
+                <div class="bg-slate-800 rounded-md p-4 text-sm text-red-400 overflow-x-auto font-mono">
+                    <pre><code># Tivemos que remover essa parte do template para evitar o loop
+# Events:
+#   S3Upload:
+#     Type: S3
+#     Properties:
+#       Bucket: !Ref S3Bucket</code></pre>
+                </div>
+            </div>
+
+            <!-- Desafio 3 -->
+            <div class="border-l-4 border-amber-500 pl-4 print:break-inside-avoid">
+                <h4 class="text-lg font-semibold text-slate-800">3. Bibliotecas e o erro "Invalid ELF header"</h4>
+                <p class="text-slate-600 mt-2 mb-3 text-justify">
+                    Como a gente estava empacotando o projeto no Windows via script PowerShell, o <code>pip</code> baixou bibliotecas pesadas como Pandas e Psycopg2 compiladas nativamente para Windows (<i>win_amd64</i>). Quando isso subiu pra AWS, a Lambda (que roda Linux) não conseguiu entender o binário e deu erro de <i>Invalid ELF header</i>. Para conseguir validar a atividade localmente e integrar com a nuvem, criamos o script de contingência <code>fix_pipeline.py</code>:
+                </p>
+                <div class="bg-slate-800 rounded-md p-4 text-sm text-blue-300 overflow-x-auto font-mono">
+                    <pre><code># Snippet do nosso script de contingência gerando tráfego
+sqs = boto3.client('sqs', region_name='us-east-1')
+entries = []
+for i in range(10):
+    entries.append({'Id': str(i), 'MessageBody': json.dumps(...)})
+sqs.send_message_batch(QueueUrl=queue_url, Entries=entries)</code></pre>
+                </div>
+            </div>
+            
+            <!-- Desafio 4 -->
+            <div class="border-l-4 border-amber-500 pl-4 print:break-inside-avoid">
+                <h4 class="text-lg font-semibold text-slate-800">4. Restrições da Conta AWS Academy</h4>
+                <p class="text-slate-600 mt-2 text-justify">
+                    O laboratório não deixava a gente criar <i>Roles</i> novas no IAM (trava da AWS). Não adiantava bater a cabeça: tivemos que enxugar as permissões no AWS SAM e reaproveitar a <code>LabRole</code> que o professor já tinha deixado pré-configurada na conta. Sem isso, o deploy falhava logo de cara.
+                </p>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
